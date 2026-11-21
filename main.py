@@ -52,7 +52,7 @@ async def setup_webhook(bot, dp, web_app: web.Application):
     )
     logger.info(f"Webhook set: {webhook_url}")
     
-    SimpleRequestHandler(dispatcher=dp, bot=bot).register(web_app.router, path=webhook_path)
+    SimpleRequestHandler(dispatcher=dp, bot=bot).register(web_app, path=webhook_path)
     setup_application(web_app, dp, bot=bot)
 
 
@@ -92,7 +92,12 @@ async def main():
         site = web.TCPSite(runner, HOST, PORT)
         await site.start()
         logger.info(f"🌐 PlanCart running at {APP_URL} (webhook mode)")
-        await asyncio.Event().wait()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            await runner.cleanup()
+            await bot.session.close()
+            logger.info("👋 Shutdown complete")
     else:
         # Long polling mode (development)
         logger.info("🔄 Starting in long-polling mode (dev)...")
