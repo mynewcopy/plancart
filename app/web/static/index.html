@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#6C63FF">
+<title>PlanCart — Мой вишлист</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<div id="app">
+  <!-- Header -->
+  <header class="header" id="header">
+    <div class="header-inner">
+      <div class="header-left">
+        <span class="logo">🛍 PlanCart</span>
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn" id="btn-search" title="Поиск">🔍</button>
+        <button class="icon-btn" id="btn-share" title="Поделиться">🔗</button>
+        <button class="icon-btn" id="btn-profile" title="Профиль">⚙️</button>
+      </div>
+    </div>
+    <!-- Search bar (hidden by default) -->
+    <div class="search-bar" id="search-bar" style="display:none;">
+      <input type="search" id="search-input" placeholder="Поиск по списку..." autocomplete="off">
+      <button id="btn-search-close">✕</button>
+    </div>
+    <!-- Filter tabs -->
+    <div class="filter-tabs" id="filter-tabs">
+      <button class="tab active" data-status="">📋 Все</button>
+      <button class="tab" data-status="planned">⭐ Планирую</button>
+      <button class="tab" data-status="bought">✅ Куплено</button>
+    </div>
+  </header>
+
+  <!-- Stats bar -->
+  <div class="stats-bar" id="stats-bar" style="display:none;">
+    <div class="stat-item">
+      <span class="stat-num" id="stat-count">0</span>
+      <span class="stat-label">товаров</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <span class="stat-num" id="stat-sum">0 ₽</span>
+      <span class="stat-label">на сумму</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <span class="stat-num" id="stat-bought">0</span>
+      <span class="stat-label">куплено</span>
+    </div>
+  </div>
+
+  <!-- Category chips -->
+  <div class="category-chips" id="category-chips">
+    <button class="chip active" data-cat="">🎯 Все</button>
+    <button class="chip" data-cat="Электроника">📱 Электроника</button>
+    <button class="chip" data-cat="Одежда">👕 Одежда</button>
+    <button class="chip" data-cat="Обувь">👟 Обувь</button>
+    <button class="chip" data-cat="Дом и дача">🏠 Дом</button>
+    <button class="chip" data-cat="Книги">📚 Книги</button>
+    <button class="chip" data-cat="Спорт">⚽ Спорт</button>
+    <button class="chip" data-cat="Красота">💄 Красота</button>
+    <button class="chip" data-cat="Игры">🎮 Игры</button>
+    <button class="chip" data-cat="Хобби">🎨 Хобби</button>
+    <button class="chip" data-cat="Другое">📦 Другое</button>
+  </div>
+
+  <!-- Items grid -->
+  <main class="items-grid" id="items-grid">
+    <div class="loading-state" id="loading-state">
+      <div class="spinner"></div>
+      <p>Загрузка...</p>
+    </div>
+    <div class="empty-state" id="empty-state" style="display:none;">
+      <div class="empty-icon">🛍️</div>
+      <h3>Список пуст</h3>
+      <p>Добавь первый товар нажав на <strong>+</strong></p>
+    </div>
+  </main>
+
+  <!-- FAB (Add button) -->
+  <button class="fab" id="fab-add" title="Добавить товар">+</button>
+</div>
+
+<!-- ==================== MODALS ==================== -->
+
+<!-- Item Form Modal -->
+<div class="modal-overlay" id="modal-item" style="display:none;">
+  <div class="modal modal-sheet" id="modal-item-sheet">
+    <div class="modal-drag-handle"></div>
+    <div class="modal-header">
+      <h2 id="modal-item-title">Добавить товар</h2>
+      <button class="modal-close" id="btn-item-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="item-form" autocomplete="off">
+        <input type="hidden" id="item-id">
+
+        <!-- URL auto-fill -->
+        <div class="form-group">
+          <label>🔗 Ссылка на товар (необязательно)</label>
+          <div class="url-input-row">
+            <input type="url" id="item-url" placeholder="https://ozon.ru/..." autocomplete="off">
+            <button type="button" class="btn-secondary btn-sm" id="btn-parse-url">Загрузить</button>
+          </div>
+          <div class="url-loading" id="url-loading" style="display:none;">
+            <span class="spinner-sm"></span> Загружаем данные...
+          </div>
+        </div>
+
+        <!-- Photos -->
+        <div class="form-group">
+          <label>📸 Фото</label>
+          <div class="photos-row" id="photos-row">
+            <button type="button" class="photo-add-btn" id="btn-add-photo">
+              <span>+</span>
+              <small>Добавить</small>
+            </button>
+          </div>
+          <input type="file" id="file-input" accept="image/*" multiple style="display:none;">
+        </div>
+
+        <!-- Title -->
+        <div class="form-group">
+          <label>📌 Название <span class="required">*</span></label>
+          <input type="text" id="item-title" placeholder="Название товара" required maxlength="200">
+        </div>
+
+        <!-- Price + Currency -->
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label>💰 Цена</label>
+            <input type="number" id="item-price" placeholder="0" min="0" step="0.01">
+          </div>
+          <div class="form-group flex-1">
+            <label>Валюта</label>
+            <select id="item-currency">
+              <option value="₽">₽ Руб</option>
+              <option value="$">$ USD</option>
+              <option value="€">€ EUR</option>
+              <option value="₺">₺ TRY</option>
+              <option value="₸">₸ KZT</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Category + Priority -->
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>📂 Категория</label>
+            <select id="item-category">
+              <option value="Другое">📦 Другое</option>
+              <option value="Электроника">📱 Электроника</option>
+              <option value="Одежда">👕 Одежда</option>
+              <option value="Обувь">👟 Обувь</option>
+              <option value="Дом и дача">🏠 Дом и дача</option>
+              <option value="Книги">📚 Книги</option>
+              <option value="Спорт">⚽ Спорт</option>
+              <option value="Красота">💄 Красота</option>
+              <option value="Игры">🎮 Игры</option>
+              <option value="Хобби">🎨 Хобби</option>
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label>🔥 Приоритет</label>
+            <select id="item-priority">
+              <option value="1">💡 Идея</option>
+              <option value="2" selected>⭐ Желательно</option>
+              <option value="3">🔥 Очень хочу</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="form-group">
+          <label>📝 Описание</label>
+          <textarea id="item-description" placeholder="Заметки, размер, цвет..." rows="3" maxlength="1000"></textarea>
+        </div>
+
+        <!-- Target date -->
+        <div class="form-group">
+          <label>📅 Планируемая дата покупки</label>
+          <input type="date" id="item-target-date">
+        </div>
+
+        <!-- Status -->
+        <div class="form-group">
+          <label>📊 Статус</label>
+          <div class="status-toggle" id="status-toggle">
+            <button type="button" class="status-btn active" data-status="planned">📋 Планирую</button>
+            <button type="button" class="status-btn" data-status="bought">✅ Куплено</button>
+            <button type="button" class="status-btn" data-status="archived">📦 Архив</button>
+          </div>
+        </div>
+
+        <!-- Private toggle -->
+        <div class="form-group">
+          <label class="toggle-label">
+            <span>🔒 Скрыть из публичного вишлиста</span>
+            <input type="checkbox" id="item-private" class="toggle-input">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <!-- Submit -->
+        <div class="form-actions">
+          <button type="submit" class="btn-primary" id="btn-save-item">💾 Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Item View Modal (detail card) -->
+<div class="modal-overlay" id="modal-view" style="display:none;">
+  <div class="modal modal-sheet" id="modal-view-sheet">
+    <div class="modal-drag-handle"></div>
+    <div class="modal-body modal-view-body" id="modal-view-body">
+      <!-- Filled by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- Profile / Settings Modal -->
+<div class="modal-overlay" id="modal-profile" style="display:none;">
+  <div class="modal modal-sheet">
+    <div class="modal-drag-handle"></div>
+    <div class="modal-header">
+      <h2>⚙️ Настройки</h2>
+      <button class="modal-close" id="btn-profile-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="profile-card" id="profile-card">
+        <!-- Filled by JS -->
+      </div>
+
+      <div class="form-group">
+        <label>📝 Название вишлиста</label>
+        <input type="text" id="profile-title" placeholder="Мой список покупок" maxlength="80">
+      </div>
+      <div class="form-group">
+        <label>💬 Описание</label>
+        <textarea id="profile-desc" placeholder="Добавь описание..." rows="2" maxlength="300"></textarea>
+      </div>
+      <div class="form-group">
+        <label>💱 Валюта по умолчанию</label>
+        <select id="profile-currency">
+          <option value="₽">₽ Рубль</option>
+          <option value="$">$ Доллар</option>
+          <option value="€">€ Евро</option>
+          <option value="₺">₺ Лира</option>
+          <option value="₸">₸ Тенге</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="toggle-label">
+          <span>🌐 Публичный вишлист</span>
+          <input type="checkbox" id="profile-public" class="toggle-input" checked>
+          <span class="toggle-slider"></span>
+        </label>
+        <small class="hint">Если включено, друзья могут видеть твой список по ссылке</small>
+      </div>
+
+      <div class="share-block" id="share-block">
+        <label>🔗 Твоя публичная ссылка:</label>
+        <div class="share-url-row">
+          <input type="text" id="public-url-input" readonly>
+          <button class="btn-icon" id="btn-copy-url" title="Копировать">📋</button>
+          <button class="btn-icon" id="btn-share-url" title="Поделиться">📤</button>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn-primary" id="btn-save-profile">💾 Сохранить</button>
+        <button class="btn-danger-outline" id="btn-regen-token">🔄 Новая ссылка</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notifications -->
+<div id="toast-container"></div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
